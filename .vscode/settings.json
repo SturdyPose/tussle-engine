@@ -1,0 +1,18 @@
+{
+    "ocaml.sandbox": {
+        "kind": "opam",
+        "switch": "default"
+    },
+    "files.associations": {
+        "glbindings.h": "c",
+        "atomic": "c",
+        "cstddef": "c",
+        "cstdint": "c",
+        "cstdlib": "c",
+        "cstring": "c",
+        "ctime": "c",
+        "type_traits": "c",
+        "xtr1common": "c",
+        "assert.h": "c"
+    }
+}

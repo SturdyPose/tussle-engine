@@ -1,0 +1,4 @@
+(executable
+ (public_name tussle_engine)
+ (name main)
+ (libraries tussle_engine glfw-ocaml))
