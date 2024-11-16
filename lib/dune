@@ -1,0 +1,9 @@
+(library
+ (public_name tussle_engine)
+ (foreign_stubs 
+   (language c)
+   (names hello)
+   )
+ (c_library_flags -lglew32 -lopengl32)
+ (libraries carray)
+ (name tussle_engine))
