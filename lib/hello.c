@@ -136,7 +136,7 @@ value gl_gen_vertex_arrays(value num_of_buffers)
 {
     CAMLparam1( num_of_buffers );
 
-    int iNumberOfBuffers = Int_val(num_of_buffers);
+    const int iNumberOfBuffers = Int_val(num_of_buffers);
     assert(iNumberOfBuffers > 0);
     // Completely arbitrary value for alloca
     GLuint* pBuffers = {};
@@ -161,6 +161,7 @@ value gl_gen_vertex_arrays(value num_of_buffers)
     if(iNumberOfBuffers > BUFFER_ALLOCA_SIZE)
     {
         free(pBuffers);
+        printf("free");
     } 
 
     CAMLreturn(camlBuffer);
@@ -186,34 +187,60 @@ value gl_bind_vertex_array(value array)
     return Val_bool(WithGLErrorCheck(glBindVertexArray((GLuint)Int_val(array))));
 }
 
-CAMLprim
-value gl_buffer_data(value target, value size, value data, value usage) 
-{
-    GLenum glTarget = (GLenum)Int_val(target);
-    GLenum glUsage = (GLenum)Int_val(usage);
 
-    const int dataTypeSize = Int_val(size);
-    const size_t floatSize = sizeof(float);
-    const int numOfElems = (int)(dataTypeSize/floatSize);
+CAMLprim
+value gl_buffer_data_float(value target, value size, value data, value usage) 
+{
+    const GLenum glTarget = (GLenum)Int_val(target);
+    const GLenum glUsage = (GLenum)Int_val(usage);
+
+    // In ocaml getting sizeof variable is pain so we will just pass the number of elements in the buffer instead
+    const int numOfElems = Int_val(size);
+    const int dataTypeSize = numOfElems * sizeof(GLfloat);
 
     glBufferData(glTarget, dataTypeSize, 0, glUsage);
-    void* pBuffer = glMapBuffer(glTarget, GL_WRITE_ONLY);
+    GLfloat* pBuffer = (GLfloat*)glMapBuffer(glTarget, GL_WRITE_ONLY);
     if(pBuffer == NULL)
     {
         printf("Couldn't map buffer");
         return Val_bool(false);
     }
 
-    float* pTempBuffer = (float*)malloc(dataTypeSize);
-
     for(int i = 0; i < numOfElems; ++i)
     {
-        pTempBuffer[i] = Double_field(data, i);
+        pBuffer[i] = (GLfloat)Double_field(data, i);
     }
 
-    memcpy(pBuffer, pTempBuffer, dataTypeSize);
     glUnmapBuffer(glTarget);
-    free(pTempBuffer);
+
+    // TODO
+    return Val_bool(1);
+}
+
+CAMLprim
+value gl_buffer_data_int(value target, value size, value data, value usage) 
+{
+    const GLenum glTarget = (GLenum)Int_val(target);
+    const GLenum glUsage = (GLenum)Int_val(usage);
+
+    // In ocaml getting sizeof variable is pain so we will just pass the number of elements in the buffer instead
+    const int numOfElems = Int_val(size);
+    const int dataTypeSize = numOfElems * sizeof(GLint);
+
+    glBufferData(glTarget, dataTypeSize, 0, glUsage);
+    GLint* pBuffer = (GLint*)glMapBuffer(glTarget, GL_WRITE_ONLY);
+    if(pBuffer == NULL)
+    {
+        printf("Couldn't map buffer");
+        return Val_bool(false);
+    }
+
+    for(GLint i = 0; i < numOfElems; ++i)
+    {
+        pBuffer[i] = Int_val(Field(data, (int)i));
+    }
+
+    glUnmapBuffer(glTarget);
 
     // TODO
     return Val_bool(1);
@@ -268,7 +295,7 @@ value gl_attach_shader(value program, value shader)
 CAMLprim
 value gl_create_program() 
 {
-    unsigned int shaderProgram = glCreateProgram();
+    const unsigned int shaderProgram = glCreateProgram();
     return Val_int(shaderProgram);
 }
 
@@ -321,10 +348,70 @@ value gl_enable_vertex_attrib_array(value index)
 CAMLprim
 value gl_draw_arrays_instanced(value mode, value first, value count, value instancecount)
 {
-    GLEnum iMode = (GLenum)Int_val(mode);        
-    GLInt iFirst = (GLInt)Int_val(first);        
-    GLsizei iCount = (GLsizei)Int_val(count);        
-    GLsizei iInstanceCount = (GLsizei)Int_val(instancecount);        
+    const GLenum iMode = (GLenum)Int_val(mode);        
+    const GLint iFirst = (GLint)Int_val(first);        
+    const GLsizei iCount = (GLsizei)Int_val(count);        
+    const GLsizei iInstanceCount = (GLsizei)Int_val(instancecount);        
 
-    Val_bool(glDrawArraysInstanced(iMode,iFirst,iCount,iInstanceCount));
+    return Val_bool(WithGLErrorCheck(glDrawArraysInstanced(iMode,iFirst,iCount,iInstanceCount)));
+}
+
+CAMLprim
+value gl_draw_elements(value mode, value count, value type, value indices)
+{
+    const GLenum iMode = (GLenum)Int_val(mode);        
+    const GLsizei iCount = (GLsizei)Int_val(count);        
+    const GLenum iType = (GLenum)Int_val(type);
+
+    unsigned int buff;
+    glGenBuffers(1,&buff); 
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buff);
+
+    switch(iType)
+    {
+        case GL_UNSIGNED_BYTE:
+        {
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, iCount * sizeof(GLbyte), 0, GL_STATIC_DRAW);
+            GLbyte* pBuffer = (GLbyte*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
+
+            for(int i = 0; i < iCount; ++i)
+            {
+                pBuffer[i] = (GLbyte)Int_val(Field(indices, i));
+            }
+
+            break;
+        }
+        case GL_UNSIGNED_SHORT:
+        {
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, iCount * sizeof(GLshort), 0, GL_STATIC_DRAW);
+            GLshort* pBuffer = (GLshort*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
+
+            for(int i = 0; i < iCount; ++i)
+            {
+                pBuffer[i] = (GLshort)Int_val(Field(indices, i));
+            }
+            break;
+        }
+        case GL_UNSIGNED_INT:
+        {
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, iCount * sizeof(GLuint), 0, GL_STATIC_DRAW);
+            GLuint* pBuffer = (GLuint*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
+
+            for(int i = 0; i < iCount; ++i)
+            {
+                pBuffer[i] = (GLuint)Int_val(Field(indices, i));
+            }
+            break;
+        }
+        default:
+        {
+            printf("gl_draw_elements doesn't accept this type: %d \n", iType);
+            return Val_bool(false);
+        }
+    }
+
+    glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+    bool res = WithGLErrorCheck(glDrawElements(iMode,iCount, iType, NULL));
+    glDeleteBuffers(1, &buff);
+    return Val_bool(res);
 }

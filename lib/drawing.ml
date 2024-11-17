@@ -929,11 +929,19 @@ let usage_mode_to_int = function
   | GL_STATIC_DRAW -> Constants.gl_STATIC_DRAW
   | GL_DYNAMIC_DRAW -> Constants.gl_DYNAMIC_DRAW
 
-external c_gl_buffer_data: int -> int -> 'a -> int -> bool = "gl_buffer_data";;
+type buffer_data_type = 
+  | FloatData of float array
+  | IntData of int array
+
+external c_gl_buffer_data_float: int -> int -> float array -> int -> bool = "gl_buffer_data_float";;
+external c_gl_buffer_data_int: int -> int -> int array -> int -> bool = "gl_buffer_data_int";;
+
 let gl_buffer_data buffer_type size data usage_mode = 
   let i_usage_mode = usage_mode_to_int usage_mode in 
   let i_buffer_type = buffer_type_to_int buffer_type in
-    c_gl_buffer_data i_buffer_type size data i_usage_mode
+    match data with
+      | FloatData x -> c_gl_buffer_data_float i_buffer_type size x i_usage_mode
+      | IntData x -> c_gl_buffer_data_int i_buffer_type size x i_usage_mode
 
 external c_gl_shader_source: shader:int -> count:int -> string:string -> length:int -> bool = "gl_shader_source";;
 external c_gl_shader_source_null_length: shader:int -> count:int -> string:string -> bool = "gl_shader_source_null_length";;
@@ -984,5 +992,10 @@ let gl_enable_vertex_attrib_array = c_gl_enable_vertex_attrib_array
 external c_gl_draw_arrays_instanced: mode:int -> first:int -> count:int -> instancecount:int -> bool = "gl_draw_arrays_instanced";;
 let gl_draw_arrays_instanced = c_gl_draw_arrays_instanced;;
 
+external c_gl_draw_elements: mode:int -> count:int -> typeOf:int -> indices: 'a array -> bool = "gl_draw_elements";;
+let gl_draw_elements mode count typeOf indices = 
+  let m = mode_to_int mode in 
+  let t = gl_type_to_int typeOf in
+    c_gl_draw_elements ~mode:m ~count:count ~typeOf:t ~indices:indices;;
 
 let draw () = ();;
