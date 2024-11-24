@@ -14,7 +14,7 @@ let () =
   GLFW.makeContextCurrent ~window:(Some window);
   if( glew_init () |> not) then print_endline "Failed to initialize GLEW" else ();
   (* Loop until the user closes the window *)
-  let vertex_shader_source = "#version 330 core
+  let vertex_shader_source = "#version 460
   layout (location = 0) in vec3 aPos;
 
   void main()
@@ -25,12 +25,16 @@ let () =
   gl_shader_source vertex_shader 1 vertex_shader_source None |> ignore;
   gl_compile_shader vertex_shader |> ignore;
 
-  let fragment_shader_source = "#version 330 core
+  let fragment_shader_source = "#version 460 
   out vec4 FragColor;
+  layout (std140, binding = 0) uniform Vals 
+  {
+      vec4 color;
+  };
 
   void main()
   {
-      FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+      FragColor = color;
   }\x00" in
   let fragment_shader = gl_create_shader GL_FRAGMENT_SHADER in
   gl_shader_source fragment_shader 1 fragment_shader_source None |> ignore;
@@ -70,6 +74,20 @@ let () =
   gl_vertex_attrib_pointer 0 3 GL_FLOAT false (3 * 4) |> ignore;
   gl_enable_vertex_attrib_array 0 |> ignore;
 
+  let ubo = gl_gen_buffer() in
+  let colors = [| 1.0; 0.0; 1.0; 1.0|] in
+  gl_bind_buffer GL_UNIFORM_BUFFER (Some ubo) |> ignore;
+  gl_buffer_data GL_UNIFORM_BUFFER ((Array.length colors)) (FloatData colors) GL_STATIC_DRAW |> ignore;
+  gl_bind_buffer_base GL_UNIFORM_BUFFER 0 ubo |> ignore;
+
+  let mapper = function index ->
+    (index == (Array.length colors - 1), 0, colors.(index)) in
+  ocaml_gl_map_buffer GL_UNIFORM_BUFFER GL_FLOAT mapper |> ignore;
+
+  let mapper = function index ->
+    (index == 0, 1, 1.0) in
+  ocaml_gl_map_buffer GL_UNIFORM_BUFFER GL_FLOAT mapper |> ignore;
+
   while not (GLFW.windowShouldClose ~window:window) do
     (* Render here *)
     gl_clear_color ~r:0.0 ~g:0.0 ~b:1.0 ~a:0.0 |> ignore;
@@ -78,6 +96,7 @@ let () =
     (* Swap front and back buffers *)
     (* Poll for and process events *)
 
+    gl_bind_vertex_array (Some vao) |> ignore;
     (* draw (); *)
     gl_use_program shader_program |> ignore;
     (* gl_draw_arrays GL_TRIANGLES 0 6 |> ignore; *)

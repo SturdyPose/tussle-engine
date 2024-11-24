@@ -510,6 +510,30 @@ value gl_buffer_sub_data_float(value target, value offset, value size, value dat
     CAMLreturn(Val_bool(1));
 }
 
+#define MAPWRITER(type, converter) {                                  \
+    type* pBuffer = (type*)glMapBuffer(glTarget, GL_WRITE_ONLY);      \
+    if(pBuffer == NULL)                                               \
+    {                                                                 \
+        printf("Couldn't map buffer\n");                              \
+        return Val_bool(false);                                       \
+    }                                                                 \
+    int iteration = 0;                                                \
+    while(true)                                                       \
+    {                                                                 \
+        result = caml_callback(writeCallback, Val_int(iteration));    \
+        bool finished = Bool_val(Field(result, 0));                   \
+        int offsetWrite = Int_val(Field(result, 1));                  \
+        type writeValue = (type)converter(Field(result, 2));          \
+        *(pBuffer + offsetWrite) = writeValue;                        \
+        ++pBuffer;                                                    \
+        ++iteration;                                                  \
+        if(finished)                                                  \
+        {                                                             \
+            break;                                                    \
+        }                                                             \
+    }                                                                 \
+}
+
 // GL map buffer but using ocaml's callbacks
 CAMLprim
 value ocaml_gl_map_write_buffer(value target, value type, value writeCallback)
@@ -519,104 +543,26 @@ value ocaml_gl_map_write_buffer(value target, value type, value writeCallback)
     GLenum glTarget = (GLenum)Int_val(target);
     GLenum enumType = (GLenum)Int_val(type);
 
-    void* pVoidBuffer = glMapBuffer(glTarget, GL_WRITE_ONLY);
-    if(pVoidBuffer == NULL)
-    {
-        printf("Couldn't map buffer\n");
-        return Val_bool(false);
-    }
-
-    // unsigned int offsetWrite = 0;
-    int iteration = 0;
     switch(enumType)
     {
         case GL_UNSIGNED_BYTE:
         {
-            GLbyte* pBuffer = (GLbyte*)pVoidBuffer;
-            while(true)
-            {
-                result = caml_callback(writeCallback, Val_int(iteration));
-                if(Is_exception_result(result))
-                {
-                    const char* exc = String_val(Extract_exception(result));
-                    printf("Exception: %s", exc);
-                }
-                bool finished = Bool_val(Field(result, 0));
-                // offsetWrite += Int_val(Field(result, 1));
-                GLubyte writeValue = (GLubyte)Int_val(Field(result, 1));
-                *pBuffer = writeValue;
-                ++pBuffer;
-                ++iteration;
-                if(finished)
-                {
-                    break;
-                }
-            }
-
+            MAPWRITER(GLbyte, Int_val);
             break;
         }
         case GL_UNSIGNED_SHORT:
         {
-            GLshort* pBuffer = (GLshort*)pVoidBuffer;
-            while(true)
-            {
-                result = caml_callback(writeCallback, iteration);
-                bool finished = Bool_val(Field(result, 0));
-                // offsetWrite += Int_val(Field(result, 1));
-                GLshort writeValue = (GLshort)Int_val(Field(result, 1));
-                *pBuffer = writeValue;
-                ++pBuffer;
-                ++iteration;
-                if(finished)
-                {
-                    break;
-                }
-            }
+            MAPWRITER(GLshort, Int_val);
             break;
         }
         case GL_UNSIGNED_INT:
         {
-            GLuint* pBuffer = (GLuint*)pVoidBuffer;
-            while(true)
-            {
-                result = caml_callback(writeCallback, iteration);
-                bool finished = Bool_val(Field(result, 0));
-                // offsetWrite += Int_val(Field(result, 1));
-                GLuint writeValue = (GLuint)Int_val(Field(result, 1));
-                *pBuffer = writeValue;
-                ++pBuffer;
-                ++iteration;
-                if(finished)
-                {
-                    break;
-                }
-            }
+            MAPWRITER(GLuint, Int_val);
             break;
         }
         case GL_FLOAT:
         {
-            GLfloat* pBuffer = (GLfloat*)pVoidBuffer;
-            while(true)
-            {
-                result = caml_callback(writeCallback, Val_int(iteration));
-                if(Is_exception_result(result))
-                {
-                    const char* exc = String_val(Extract_exception(result));
-                    printf("Exception: %s", exc);
-                }
-                bool finished = Bool_val(Field(result, 0));
-                // offsetWrite += Int_val(Field(result, 1));
-                GLfloat writeValue = (GLfloat)Double_val(Field(result,1));
-                *pBuffer = writeValue;
-                ++pBuffer;
-                ++iteration;
-                if(finished)
-                {
-                    break;
-                }
-                // glCheckError();
-            }
-
+            MAPWRITER(GLfloat, Double_val);
             break;
         }
         default:

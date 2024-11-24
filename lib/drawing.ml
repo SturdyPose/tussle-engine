@@ -1017,7 +1017,8 @@ let gl_bind_buffer_base target index buffer =
   let a = buffer_type_to_int target in 
   c_gl_bind_buffer_base ~target:a ~index:index ~buffer:buffer
 
-external c_ocaml_gl_map_buffer: target:int -> typeOf:int -> (int -> bool * 'a) -> bool = "ocaml_gl_map_write_buffer"
+(* callback = index -> (predicate, paddingInBuffer, value) *)
+external c_ocaml_gl_map_buffer: target:int -> typeOf:int -> (int -> bool * int * 'a) -> bool = "ocaml_gl_map_write_buffer"
 let ocaml_gl_map_buffer target typeOf writeCallback = 
   let t = gl_type_to_int typeOf in 
   let i_buffer_type = buffer_type_to_int target in
