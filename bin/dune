@@ -1,4 +1,5 @@
 (executable
  (public_name tussle_engine)
  (name main)
+ (promote (into "../release"))
  (libraries tussle_engine glfw-ocaml))

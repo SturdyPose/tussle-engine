@@ -914,10 +914,15 @@ let buffer_type_to_int = function
   | GL_UNIFORM_BUFFER -> Constants.gl_UNIFORM_BUFFER
 
 external c_gl_bind_buffer: int -> int -> bool = "gl_bind_buffer";;
-let gl_bind_buffer buffer_type ibuffer = let i_buffer_type = buffer_type_to_int buffer_type in c_gl_bind_buffer i_buffer_type ibuffer;;
+let gl_bind_buffer buffer_type ibuffer = let i_buffer_type = buffer_type_to_int buffer_type in 
+  match ibuffer with
+    | Some b -> c_gl_bind_buffer i_buffer_type b 
+    | None -> c_gl_bind_buffer i_buffer_type 0 
 
 external c_gl_bind_vertex_array: int -> bool = "gl_bind_vertex_array";;
-let gl_bind_vertex_array = c_gl_bind_vertex_array;;
+let gl_bind_vertex_array iarray = match iarray with 
+  | Some ia -> c_gl_bind_vertex_array ia
+  | None -> c_gl_bind_vertex_array 0 
 
 type usage_mode =
   | GL_STREAM_DRAW
@@ -999,3 +1004,21 @@ let gl_draw_elements mode count typeOf indices =
     c_gl_draw_elements ~mode:m ~count:count ~typeOf:t ~indices:indices;;
 
 let draw () = ();;
+
+external c_gl_get_uniform_block_index: program:int -> uniformBlockName:string -> int = "gl_get_uniform_block_index"
+let gl_get_uniform_block_index = c_gl_get_uniform_block_index
+
+external c_gl_uniform_block_binding: program:int -> uniformBlockIndex:int -> uniformBlockBinding:int -> bool = "gl_uniform_block_binding"
+let gl_uniform_block_binding = c_gl_uniform_block_binding
+
+
+external c_gl_bind_buffer_base: target:int -> index:int -> buffer:int -> bool = "gl_bind_buffer_base"
+let gl_bind_buffer_base target index buffer = 
+  let a = buffer_type_to_int target in 
+  c_gl_bind_buffer_base ~target:a ~index:index ~buffer:buffer
+
+external c_ocaml_gl_map_buffer: target:int -> typeOf:int -> (int -> bool * 'a) -> bool = "ocaml_gl_map_write_buffer"
+let ocaml_gl_map_buffer target typeOf writeCallback = 
+  let t = gl_type_to_int typeOf in 
+  let i_buffer_type = buffer_type_to_int target in
+    c_ocaml_gl_map_buffer ~target:i_buffer_type ~typeOf:t writeCallback

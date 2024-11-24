@@ -64,8 +64,8 @@ let () =
     |] in
   let vbo = gl_gen_buffer () in
   let vao = gl_gen_vertex_array () in
-  gl_bind_vertex_array vao |> ignore;
-  gl_bind_buffer GL_ARRAY_BUFFER vbo |> ignore;
+  gl_bind_vertex_array (Some vao) |> ignore;
+  gl_bind_buffer GL_ARRAY_BUFFER (Some vbo) |> ignore;
   gl_buffer_data GL_ARRAY_BUFFER ((Array.length vertices)) (FloatData vertices) GL_STATIC_DRAW |> ignore;
   gl_vertex_attrib_pointer 0 3 GL_FLOAT false (3 * 4) |> ignore;
   gl_enable_vertex_attrib_array 0 |> ignore;

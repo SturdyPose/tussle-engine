@@ -3,15 +3,31 @@
 
 #include <caml/alloc.h>
 #include <caml/memory.h>
+#include <caml/callback.h>
 #include <assert.h>
 #include <stdbool.h>
 
-
-CAMLprim 
-value something()
+GLenum glCheckError_(const char *file, int line)
 {
-    return Val_int(50);
+    GLenum errorCode;
+    while ((errorCode = glGetError()) != GL_NO_ERROR)
+    {
+        char* error;
+        switch (errorCode)
+        {
+            case GL_INVALID_ENUM:                  error = "INVALID_ENUM"; break;
+            case GL_INVALID_VALUE:                 error = "INVALID_VALUE"; break;
+            case GL_INVALID_OPERATION:             error = "INVALID_OPERATION"; break;
+            case GL_STACK_OVERFLOW:                error = "STACK_OVERFLOW"; break;
+            case GL_STACK_UNDERFLOW:               error = "STACK_UNDERFLOW"; break;
+            case GL_OUT_OF_MEMORY:                 error = "OUT_OF_MEMORY"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
+        }
+        printf("error: %s, file: %s, line: %d", error, file, line);
+    }
+    return errorCode;
 }
+#define glCheckError() glCheckError_(__FILE__, __LINE__) 
 
 CAMLprim
 value glew_init()
@@ -62,29 +78,31 @@ CAMLprim
 value gl_clear_color(value r, value g, value b, value a)
 {
     CAMLparam4(r,g,b,a);
-    return Val_bool(WithGLErrorCheck(glClearColor(Double_val(r), Double_val(g), Double_val(b), Double_val(a))));
+    CAMLreturnT(bool, WithGLErrorCheck(glClearColor(Double_val(r), Double_val(g), Double_val(b), Double_val(a))));
 }
 
 CAMLprim
 value gl_clear(value mask) 
 {
     CAMLparam1(mask);
-    return Val_bool(WithGLErrorCheck(glClear(Int_val(mask))));
+    CAMLreturn(Val_bool(WithGLErrorCheck(glClear(Int_val(mask)))));
 }
 
 CAMLprim
 value gl_draw_arrays(value mode, value first, value count) 
 {
+    CAMLparam3(mode,first,count);
     GLenum drawMode = (GLenum)Int_val(mode);
     GLint ifirst = (GLint)Int_val(first);
     GLsizei icount = (GLsizei)Int_val(count);
-    return Val_bool(WithGLErrorCheck(glDrawArrays(drawMode, ifirst, count)));
+    CAMLreturnT(bool, WithGLErrorCheck(glDrawArrays(drawMode, ifirst, count)));
 }
 
 CAMLprim
 value gl_create_shader(value shader_type) 
 {
-    return Val_int(glCreateShader(Int_val(shader_type)));
+    CAMLparam1(shader_type);
+    CAMLreturn(Val_int(glCreateShader(Int_val(shader_type))));
 }
 
 #define BUFFER_ALLOCA_SIZE 16
@@ -126,9 +144,10 @@ value gl_gen_buffers(value num_of_buffers)
 CAMLprim
 value gl_gen_buffer() 
 {
+    CAMLparam0();
     unsigned int buffer;
     glGenBuffers(1, &buffer);
-    return Val_int(buffer);
+    CAMLreturn(Val_int((int)buffer));
 }
 
 CAMLprim
@@ -161,7 +180,6 @@ value gl_gen_vertex_arrays(value num_of_buffers)
     if(iNumberOfBuffers > BUFFER_ALLOCA_SIZE)
     {
         free(pBuffers);
-        printf("free");
     } 
 
     CAMLreturn(camlBuffer);
@@ -170,27 +188,30 @@ value gl_gen_vertex_arrays(value num_of_buffers)
 CAMLprim
 value gl_gen_vertex_array() 
 {
+    CAMLparam0();
     unsigned int buffer;
     glGenVertexArrays(1, &buffer);
-    return Val_int(buffer);
+    CAMLreturn(Val_int(buffer));
 }
 
 CAMLprim
 value gl_bind_buffer(value mode, value ibuffer) 
 {
-    return Val_bool(WithGLErrorCheck(glBindBuffer((GLenum)Int_val(mode), (GLuint)Int_val(ibuffer))));
+    CAMLparam2(mode,ibuffer);
+    CAMLreturnT(bool,WithGLErrorCheck(glBindBuffer((GLenum)Int_val(mode), (GLuint)Int_val(ibuffer))));
 }
 
 CAMLprim
 value gl_bind_vertex_array(value array) 
 {
-    return Val_bool(WithGLErrorCheck(glBindVertexArray((GLuint)Int_val(array))));
+    CAMLparam1(array);
+    CAMLreturnT(bool, WithGLErrorCheck(glBindVertexArray((GLuint)Int_val(array))));
 }
-
 
 CAMLprim
 value gl_buffer_data_float(value target, value size, value data, value usage) 
 {
+    CAMLparam4(target,size,data,usage);
     const GLenum glTarget = (GLenum)Int_val(target);
     const GLenum glUsage = (GLenum)Int_val(usage);
 
@@ -199,11 +220,12 @@ value gl_buffer_data_float(value target, value size, value data, value usage)
     const int dataTypeSize = numOfElems * sizeof(GLfloat);
 
     glBufferData(glTarget, dataTypeSize, 0, glUsage);
+
     GLfloat* pBuffer = (GLfloat*)glMapBuffer(glTarget, GL_WRITE_ONLY);
     if(pBuffer == NULL)
     {
         printf("Couldn't map buffer");
-        return Val_bool(false);
+        CAMLreturn(Val_bool(false));
     }
 
     for(int i = 0; i < numOfElems; ++i)
@@ -214,12 +236,13 @@ value gl_buffer_data_float(value target, value size, value data, value usage)
     glUnmapBuffer(glTarget);
 
     // TODO
-    return Val_bool(1);
+    CAMLreturn(Val_bool(true)); 
 }
 
 CAMLprim
 value gl_buffer_data_int(value target, value size, value data, value usage) 
 {
+    CAMLparam4(target,size,data,usage);
     const GLenum glTarget = (GLenum)Int_val(target);
     const GLenum glUsage = (GLenum)Int_val(usage);
 
@@ -232,7 +255,7 @@ value gl_buffer_data_int(value target, value size, value data, value usage)
     if(pBuffer == NULL)
     {
         printf("Couldn't map buffer");
-        return Val_bool(false);
+        CAMLreturn(Val_bool(false));
     }
 
     for(GLint i = 0; i < numOfElems; ++i)
@@ -243,86 +266,93 @@ value gl_buffer_data_int(value target, value size, value data, value usage)
     glUnmapBuffer(glTarget);
 
     // TODO
-    return Val_bool(1);
+    CAMLreturn(Val_bool(true)); 
 }
-
 
 CAMLprim
 value gl_shader_source(value shader, value count, value string, value length) 
 {
+    CAMLparam4(shader,count,string,length);
     const int len = Int_val(length);
     const int lenCopy = 0;
     const GLsizei glCount = (GLsizei)Int_val(count);
     const char* camlSource = String_val(string);
     const char* src[] = { camlSource };
 
-    return Val_bool(WithGLErrorCheck(glShaderSource((GLuint)Int_val(shader), glCount, &camlSource, &len)));
+    CAMLreturnT(bool, WithGLErrorCheck(glShaderSource((GLuint)Int_val(shader), glCount, &camlSource, &len)));
 }
 
 CAMLprim
 value gl_shader_source_null_length(value shader, value count, value string) 
 {
+    CAMLparam3(shader,count,string);
     const int lenCopy = 0;
     const GLsizei glCount = (GLsizei)Int_val(count);
     const char* camlSource = String_val(string);
     const char* src[] = { camlSource };
 
-    return Val_bool(WithGLErrorCheck(glShaderSource((GLuint)Int_val(shader), glCount, &camlSource, NULL)));
+    CAMLreturnT(bool,WithGLErrorCheck(glShaderSource((GLuint)Int_val(shader), glCount, &camlSource, NULL)));
 }
 
 CAMLprim
 value gl_compile_shader(value shader) 
 {
+    CAMLparam1(shader);
     GLuint uishader = (GLuint)Int_val(shader);
-    bool success_compiled = Val_bool(WithGLErrorCheck(glCompileShader(uishader)));
+    bool success_compiled = WithGLErrorCheck(glCompileShader(uishader));
     int success = 0;
     glGetShaderiv(uishader, GL_COMPILE_STATUS, &success);
     if(!success)
     {
         char infoLog[512];
         glGetShaderInfoLog(uishader, 512, NULL, infoLog);
-        printf("Can't compile shader: %s",infoLog); 
+        printf("Can't compile shader: %s", infoLog); 
     }
-    return success_compiled;
+    CAMLreturnT(bool, success_compiled);
 }
 
 CAMLprim
 value gl_attach_shader(value program, value shader) 
 {
-    return Val_bool(WithGLErrorCheck(glAttachShader((GLuint)Int_val(program), (GLuint)Int_val(shader))));
+    CAMLparam2(program,shader);
+    CAMLreturnT(bool, WithGLErrorCheck(glAttachShader((GLuint)Int_val(program), (GLuint)Int_val(shader))));
 }
 
 CAMLprim
 value gl_create_program() 
 {
+    CAMLparam0();
     const unsigned int shaderProgram = glCreateProgram();
-    return Val_int(shaderProgram);
+    CAMLreturn(Val_int((int)shaderProgram));
 }
 
 CAMLprim
 value gl_link_program(value program) 
 {
-    return Val_bool(WithGLErrorCheck(glLinkProgram((GLuint)Int_val(program))));
+    CAMLparam1(program);
+    CAMLreturnT(bool,WithGLErrorCheck(glLinkProgram((GLuint)Int_val(program))));
 }
 
 CAMLprim
 value gl_use_program(value program) 
 {
-    return Val_bool(WithGLErrorCheck(glUseProgram((GLuint)Int_val(program))));
+    CAMLparam1(program);
+    CAMLreturnT(bool, WithGLErrorCheck(glUseProgram((GLuint)Int_val(program))));
 }
 
 CAMLprim
 value gl_delete_shader(value shader) 
 {
-    return Val_bool(WithGLErrorCheck(glDeleteShader((GLuint)Int_val(shader))));
+    CAMLparam1(shader);
+    CAMLreturnT(bool,WithGLErrorCheck(glDeleteShader((GLuint)Int_val(shader))));
 }
 
 // TODO: direct buffer pointers are unsupported 
 CAMLprim
 value gl_vertex_attrib_pointer(value index, value size, value type, value normalized, value stride) 
 {
-    return Val_bool(
-        WithGLErrorCheck(
+    CAMLparam5(index,size,type,normalized,stride);
+    CAMLreturnT(bool, WithGLErrorCheck(
             glVertexAttribPointer(
                 (GLuint)Int_val(index),
                 (GLint)Int_val(size),
@@ -342,25 +372,34 @@ value gl_vertex_attrib_pointer_params(value * argv, int /*argn*/)
 CAMLprim
 value gl_enable_vertex_attrib_array(value index)
 {
-    return Val_bool(WithGLErrorCheck(glEnableVertexAttribArray((GLuint)Int_val(index))));
+    CAMLparam1(index);
+    glEnableVertexAttribArray((GLuint)Int_val(index));
+    CAMLreturn(Val_unit);
 }
 
 CAMLprim
 value gl_draw_arrays_instanced(value mode, value first, value count, value instancecount)
 {
+    CAMLparam4(mode,first,count,instancecount);
     const GLenum iMode = (GLenum)Int_val(mode);        
     const GLint iFirst = (GLint)Int_val(first);        
     const GLsizei iCount = (GLsizei)Int_val(count);        
     const GLsizei iInstanceCount = (GLsizei)Int_val(instancecount);        
 
-    return Val_bool(WithGLErrorCheck(glDrawArraysInstanced(iMode,iFirst,iCount,iInstanceCount)));
+    CAMLreturnT(bool, WithGLErrorCheck(glDrawArraysInstanced(iMode,iFirst,iCount,iInstanceCount)));
 }
 
 CAMLprim
 value gl_draw_elements(value mode, value count, value type, value indices)
 {
-    const GLenum iMode = (GLenum)Int_val(mode);        
+    CAMLparam4(mode,count,type,indices);
     const GLsizei iCount = (GLsizei)Int_val(count);        
+    if(iCount == 0)
+    {
+        return Val_bool(true);
+    }
+
+    const GLenum iMode = (GLenum)Int_val(mode);        
     const GLenum iType = (GLenum)Int_val(type);
 
     unsigned int buff;
@@ -378,7 +417,6 @@ value gl_draw_elements(value mode, value count, value type, value indices)
             {
                 pBuffer[i] = (GLbyte)Int_val(Field(indices, i));
             }
-
             break;
         }
         case GL_UNSIGNED_SHORT:
@@ -413,5 +451,182 @@ value gl_draw_elements(value mode, value count, value type, value indices)
     glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
     bool res = WithGLErrorCheck(glDrawElements(iMode,iCount, iType, NULL));
     glDeleteBuffers(1, &buff);
-    return Val_bool(res);
+    CAMLreturnT(bool, res);
 }
+
+CAMLprim
+value gl_get_uniform_block_index(value program, value uniformBlockName)
+{
+    CAMLparam2(program, uniformBlockName);
+    const GLuint uprogram = (GLuint)Int_val(program);        
+    const char* uniformBlockNameStr = String_val(uniformBlockName);
+    const GLuint v = glGetUniformBlockIndex(uprogram, uniformBlockNameStr);
+    CAMLreturn(Val_int((int)v));
+}
+
+CAMLprim
+value gl_uniform_block_binding(value program, value uniformBlockIndex, value uniformBlockBinding)
+{
+    CAMLparam3(program,uniformBlockIndex, uniformBlockBinding);
+    const GLuint uprogram = (GLuint)Int_val(program);        
+    const GLuint uuniformBlockIndex = (GLuint)Int_val(uniformBlockIndex);
+    const GLuint uuniformBlockBinding = (GLuint)Int_val(uniformBlockBinding);
+    CAMLreturnT(bool, WithGLErrorCheck(glUniformBlockBinding(uprogram,uuniformBlockIndex, uuniformBlockBinding)));
+}
+
+CAMLprim
+value gl_bind_buffer_base(value target, value index, value buffer)
+{
+    CAMLparam3(target,index,buffer);
+    const GLenum enumTarget = (GLenum)Int_val(target);
+    const GLuint uIndex = (GLuint)Int_val(index);
+    const GLuint uBuffer = (GLuint)Int_val(buffer);
+    CAMLreturn(Val_bool(WithGLErrorCheck(glBindBufferBase(enumTarget, uIndex, uBuffer))));
+}
+
+CAMLprim
+value gl_buffer_sub_data_float(value target, value offset, value size, value data)
+{
+    CAMLparam4(target,offset,size,data);
+    const GLenum glTarget = (GLenum)Int_val(target);
+    const GLintptr uOffset = (GLintptr)Int_val(offset);
+    const GLsizeiptr numOfElems = (GLsizeiptr)Int_val(size);
+
+    GLfloat* pBuffer = (GLfloat*)glMapBuffer(glTarget, GL_WRITE_ONLY);
+    if(pBuffer == NULL)
+    {
+        printf("Couldn't map buffer");
+        CAMLreturn(Val_bool(false));
+    }
+
+    for(int i = uOffset; i < numOfElems; ++i)
+    {
+        pBuffer[i] = (GLfloat)Double_field(data, i);
+    }
+
+    glUnmapBuffer(glTarget);
+
+    // TODO
+    CAMLreturn(Val_bool(1));
+}
+
+// GL map buffer but using ocaml's callbacks
+CAMLprim
+value ocaml_gl_map_write_buffer(value target, value type, value writeCallback)
+{
+    CAMLparam3(target,type,writeCallback);
+    CAMLlocal1(result);
+    GLenum glTarget = (GLenum)Int_val(target);
+    GLenum enumType = (GLenum)Int_val(type);
+
+    void* pVoidBuffer = glMapBuffer(glTarget, GL_WRITE_ONLY);
+    if(pVoidBuffer == NULL)
+    {
+        printf("Couldn't map buffer\n");
+        return Val_bool(false);
+    }
+
+    // unsigned int offsetWrite = 0;
+    int iteration = 0;
+    switch(enumType)
+    {
+        case GL_UNSIGNED_BYTE:
+        {
+            GLbyte* pBuffer = (GLbyte*)pVoidBuffer;
+            while(true)
+            {
+                result = caml_callback(writeCallback, Val_int(iteration));
+                if(Is_exception_result(result))
+                {
+                    const char* exc = String_val(Extract_exception(result));
+                    printf("Exception: %s", exc);
+                }
+                bool finished = Bool_val(Field(result, 0));
+                // offsetWrite += Int_val(Field(result, 1));
+                GLubyte writeValue = (GLubyte)Int_val(Field(result, 1));
+                *pBuffer = writeValue;
+                ++pBuffer;
+                ++iteration;
+                if(finished)
+                {
+                    break;
+                }
+            }
+
+            break;
+        }
+        case GL_UNSIGNED_SHORT:
+        {
+            GLshort* pBuffer = (GLshort*)pVoidBuffer;
+            while(true)
+            {
+                result = caml_callback(writeCallback, iteration);
+                bool finished = Bool_val(Field(result, 0));
+                // offsetWrite += Int_val(Field(result, 1));
+                GLshort writeValue = (GLshort)Int_val(Field(result, 1));
+                *pBuffer = writeValue;
+                ++pBuffer;
+                ++iteration;
+                if(finished)
+                {
+                    break;
+                }
+            }
+            break;
+        }
+        case GL_UNSIGNED_INT:
+        {
+            GLuint* pBuffer = (GLuint*)pVoidBuffer;
+            while(true)
+            {
+                result = caml_callback(writeCallback, iteration);
+                bool finished = Bool_val(Field(result, 0));
+                // offsetWrite += Int_val(Field(result, 1));
+                GLuint writeValue = (GLuint)Int_val(Field(result, 1));
+                *pBuffer = writeValue;
+                ++pBuffer;
+                ++iteration;
+                if(finished)
+                {
+                    break;
+                }
+            }
+            break;
+        }
+        case GL_FLOAT:
+        {
+            GLfloat* pBuffer = (GLfloat*)pVoidBuffer;
+            while(true)
+            {
+                result = caml_callback(writeCallback, Val_int(iteration));
+                if(Is_exception_result(result))
+                {
+                    const char* exc = String_val(Extract_exception(result));
+                    printf("Exception: %s", exc);
+                }
+                bool finished = Bool_val(Field(result, 0));
+                // offsetWrite += Int_val(Field(result, 1));
+                GLfloat writeValue = (GLfloat)Double_val(Field(result,1));
+                *pBuffer = writeValue;
+                ++pBuffer;
+                ++iteration;
+                if(finished)
+                {
+                    break;
+                }
+                // glCheckError();
+            }
+
+            break;
+        }
+        default:
+        {
+            printf("ocaml_gl_map_write_buffer doesn't accept this type: %d \n", enumType);
+            CAMLreturn(Val_bool(false));
+        }
+    }
+    glUnmapBuffer(glTarget);
+
+    // TODO
+    CAMLreturn(Val_bool(true));
+} 
